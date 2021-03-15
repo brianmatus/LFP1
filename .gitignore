@@ -1,0 +1,5 @@
+venv/*
+.idea/*
+
+/LAB/proyecto1/venv/*
+/LAB/practica1/venv/*
