@@ -1,8 +1,2 @@
-venv/*
-.idea/*
-
-/LAB/proyecto1/venv/*
-/LAB/proyecto1/.idea/*
-
-/LAB/practica1/venv/*
-/LAB/practica1/.idea/*
+venv/
+.idea/
