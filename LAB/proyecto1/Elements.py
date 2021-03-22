@@ -11,7 +11,7 @@ class Category:
 
 
 class Product:
-    def __init__(self, name, real_name, description, price):
+    def __init__(self, name, real_name, price, description):
         self.name = name
         self.real_name = real_name
         self.description = description

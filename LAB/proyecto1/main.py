@@ -1,8 +1,8 @@
 from TDA import *
 from Elements import *
-# from xml.dom import minidom
 # from graphviz import Digraph
 from easygui import fileopenbox
+from html_export import *
 
 menu_string, order_string = " ", " "
 
@@ -13,6 +13,8 @@ error_list = LinkedList()
 token_list = LinkedList()
 
 restaurant_word = "restaurante"
+
+invoices = 0
 
 
 def main():
@@ -37,9 +39,10 @@ def main():
             open_order()
         elif option == "3":
             load_menu()
+            export_menu(restaurant)
         elif option == "4":
             load_order()
-            pass
+            generate_recipe()
         elif option == "5":
             pass
         elif option == "6":
@@ -51,6 +54,39 @@ def main():
             debug_load()
         else:
             "No has ingresado una opción valida, inténtalo otra vez"
+
+
+# 0: success
+# 1: item doesn't exist
+def generate_recipe():
+    global invoices
+
+    shopped_items = []
+    subtotal = 0
+
+    for p in order.shopped_products:
+        item = get_item(p.name)
+        if item is None:
+            print(f'generate_recipe:::{p.name} no existe en ninguna sección, abortando factura')
+            return 1
+        shopped_items.append([p.quantity, item.real_name, item.price])
+        subtotal += float(p.quantity) * float(item.price)
+
+    subtotal = round(subtotal, 2)
+    total = round(subtotal * (1 + float(order.tip)/100), 2)
+
+    print(f'subtotal:{subtotal} total:{total} list: {shopped_items}')
+
+    invoices += 1
+    export_recipe(order.client_name, order.address, order.nit, order.tip, shopped_items, subtotal, total, invoices)
+
+
+def get_item(item_id):
+    for cat in restaurant.categories:
+        el = cat.elements.get(item_id)
+        if el is not None:
+            return el
+    return None
 
 
 def print_structure():
@@ -310,7 +346,6 @@ def afd_id_ln(s, _i, i, row):
                 report_token(first_i, row, buffer, "id")
                 return buffer, _i, i, row
 
-
             elif c == 32 or c == 9:  # tab space
                 i += 1
 
@@ -321,7 +356,7 @@ def afd_id_ln(s, _i, i, row):
 
 
 def afd_order_data(s, _i, i, row):
-    client_name, nit, address, tip = "", "", "", ""
+    # client_name, nit, address, tip = "", "", "", ""  # TODO check if this is really unnecessary
     buffer = []
     state = 0
     diff = 0
@@ -1041,6 +1076,11 @@ def debug_load():
 
     with open("C:\\Users\\Matus\\Documents\\USAC\\LFP1\\LAB\\proyecto1\\orden.lfp", 'r', encoding="utf-8") as file:
         order_string = "".join(line for line in file) + "\n"
+
+
+
+
+
 
 
 if __name__ == '__main__':
