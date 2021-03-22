@@ -4,7 +4,7 @@ restaurante='Restaurante LFP'
 [ bebida_2;'Bebida #2';10.50;    'Descripción Bebida 2']
 
 'Desayunos':
-[d1;'Desayuno 1';45.00;;'Descripción Desayuno 1']
+[d1;'Desayuno 1';45.00;'Descripción Desayuno 1']
 [d2 ;'Desayuno 2';    40.   ;'Descripción Desayuno 2']
 [d3;'Desayuno 3';35;'Descripción Desayuno 3']
 

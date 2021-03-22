@@ -8,7 +8,9 @@ menu_string, order_string = " ", " "
 
 restaurant = Restaurant("", LinkedList())
 order = Order("", "", "", "", LinkedList())
+
 error_list = LinkedList()
+token_list = LinkedList()
 
 restaurant_word = "restaurante"
 
@@ -57,12 +59,26 @@ def print_structure():
     for c in restaurant.categories:
         print(f'--------------Category name:{c.name}------------')
         for p in c.elements:
-            print(f'id:{p.name} name:{p.real_name} price:{p.price} descrip:{p.description}')
+            print(f'id:{p.name} name:{p.real_name} price:{p.price} description:{p.description}')
 
     print("************************************************************************************")
     print("************************************************************************************")
     for error in error_list:
         print(f'row={error.row} index={error.index} msg={error.msg}')
+
+    print("************************************************************************************")
+    print("************************************************************************************")
+    for el in token_list:
+        print(f'row={el.row} index={el.i} token={el.token} lex={el.lex}')
+
+    print("************************************************************************************")
+    print("************************************************************************************")
+    print(f'Order client:{order.client_name}')
+    print(f'Order address:{order.address}')
+    print(f'Order nit:{order.nit}')
+    print(f'Order tip:{order.tip}')
+    for p in order.shopped_products:
+        print(f'Quantity:{p.quantity}  Name:{p.name}')
 
 
 def load_menu():
@@ -142,75 +158,143 @@ def load_order():
     global_i, local_i, row = 0, 1, 1
 
     data, global_i, local_i, row = afd_order_data(order_string, global_i, local_i, row)
-    print(f'load_order:::data reconocida: {data}')
+    order.client_name = data[0]
+    order.nit = data[1]
+    order.address = data[2]
+    order.tip = data[3]
 
+    global_i += 1  # initial \n
+    print(f'load_order:::data reconocida: {data}')
     while global_i < len(order_string):
         data, global_i, local_i, row = afd_product_buy(order_string, global_i, local_i, row)
-        print(f'load_order:::data reconocida: {data}')
+        # global_i += 1
+        print(f'load_order:::product reconocida: {data}')
+        print(f'substring at {global_i}: {order_string[global_i:]}')
+        order.shopped_products.insert(ShoppedProduct(data[1], data[0]))
 
 
 def afd_product_buy(s, _i, i, row):
-    # quantity, id = 0, ""
     buffer = []
     state = 0
     diff = 0
 
+    print(f'afd_product_buy:::analyzing at _i={_i} row={row} i={i}:  {s[_i:]}')
+
     for _c in list(s[_i:]):
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         c = ord(_c)
         print(f'afd_product_buy:::state = {state} row={row} i={i} {c}:{_c}')
         if state == 0:
-            if c == 10:  # \n
-                i = 1
-                row += 1
-                report_error(i, row, f'afd_product_buy:::state = {state} \\n antes de tiempo, Se esperaba ","')
-            elif c == 32 or c == 9:  # space tab
-                i += 1
-            elif c == 44:  # ,
-                i += 1
+            print(f'afd_product_buy:::diff es: {diff} _i:{_i} row:{row} i:{i} ')
+            if diff == 0:
+                pre = _i
+                quantity, post, i, row = afd_integer_comma(s, _i, i, row)
+                diff = post - pre  # -1 for ;
+                print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                print(f'afd_product_buy:::state = {state}  quantity reconocida: {quantity} con diff={diff}')
+                print(f'afd_product_buy:::state = {state} _i={_i} row={row} i={i} substring is {s[pre+diff:]}')
+                print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                buffer.append(quantity)
+            elif diff > 2:
+                diff -= 1
+            elif diff == 2:
+                diff = 0
+                # i += 1
+                # print(f'afd_product_buy:::state = {state}  cambiando estado a 1 con _i={_i} row={row} i={i}')
                 state = 1
+
         elif state == 1:
             # print(f'afd_order_data:::diff es: {diff} _i:{_i}  i:{i} row:{row}')
             if diff == 0:
+                print("initial, diff 0")
                 pre = _i
-                quantity, post, i, row = afd_chain(s, _i, i, row)
-                diff = post - pre - 1  # -1 for ;
+                product_id, post, i, row = afd_id_ln(s, _i, i, row)
+                diff = post - pre  # -1 for ;
                 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-                print(f'afd_order_data:::state = {state}  client_name reconocida: {quantity}')
+                print(f'afd_product_buy:::state = {state}  product_id reconocida: {product_id}')
                 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-                buffer.append(quantity)
+                buffer.append(product_id)
             elif diff > 1:
                 diff -= 1
             elif diff == 1:
-                diff = 0
-                # print(f'afd_order_data:::state = {state} last to jump')
+                # diff = 0  #TODO uncomment, it was just to comply with compiler
+                # i += 1
+                _i += 1
+                return buffer, _i, i, row
+        _i += 1
+
+
+def afd_integer_comma(s, _i, i, row):
+    buffer = ""
+    state = 0
+    first_i = i
+
+    # print(f'afd_integer_comma:::string to analyze: {s[_i:]}')
+
+    for _c in list(s[_i:]):
+        c = ord(_c)
+        print(f'afd_integer_comma:::state = {state} row={row} i={i} {c}:{_c}')
+
+        if state == 0:
+            if 48 <= c <= 57:  # 0-9
+                first_i = i
                 i += 1
-                state = 1
+                buffer += _c
+
+            elif c == 10:  # \n
+                i = 1
+                row += 1
+                report_error(i, row, f'afd_integer_comma:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
+
+            elif c == 32 or c == 9:  # tab space
+                i += 1
+
+            elif c == 44:  # ,
+                i += 1
+                _i += 1
+
+                print(f'comma at row={row} i={i}')
+                report_token(first_i, row, buffer, "integer")
+                return buffer, _i, i, row
+
+            else:
+                # i += 1
+                _i += 1
+                report_error(i, row, f'afd_integer_comma:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
+        _i += 1
 
 
 def afd_id_ln(s, _i, i, row):
     # global menu_string
     buffer = ""
     state = 0
+    first_i = i
+
+    # print(f'afd_id_ln:::string to analyze: {s[_i:]}')
 
     for _c in list(s[_i:]):
         c = ord(_c)
-        print(f'afd_id_eq:::state = {state} row={row} i={i} {c}:{_c}')
+        print(f'afd_id_ln:::state = {state} row={row} i={i} {c}:{_c}')
 
         if state == 0:
 
-            if c == 10:
+            if c == 10:  # \n
                 i = 1
                 row += 1
-                report_error(i, row, f'afd_product_buy:::state = {state} \\n antes de tiempo, Se esperaba id')
+                report_error(i, row, f'afd_id_ln:::state = {state} \\n antes de tiempo, Se esperaba id')
 
-            elif (65 <= c <= 90) or (97 <= c <= 122):
+            elif 97 <= c <= 122:
+                first_i = i
                 i += 1
                 buffer += _c
                 state = 1
 
+            elif c == 32 or c == 9:  # tab space
+                i += 1
+
             else:
                 i += 1
-                report_error(i, row, "afd_id_eq:::Se esperaba a-z, se encontró " + _c)
+                report_error(i, row, f'afd_id_ln:::state = {state} Se esperaba a-z, se encontró "{_c}"')
 
         elif state == 1:
             if (48 <= c <= 57) or (65 <= c <= 90) or (97 <= c <= 122) or c == 95:
@@ -220,27 +304,19 @@ def afd_id_ln(s, _i, i, row):
             elif c == 10:  # \n
                 i = 1
                 row += 1
-                report_error(i, row, f'afd_product_buy:::state = {state} \\n antes de tiempo, Se esperaba id')
+                print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                print(f'afd_id_eq:::final:{buffer}')
+                print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+                report_token(first_i, row, buffer, "id")
+                return buffer, _i, i, row
+
 
             elif c == 32 or c == 9:  # tab space
                 i += 1
 
-            elif c == 61:
-                i += 1
-                state = 2
             else:
-                report_error(i, row, "afd_id_eq:::Se esperaba [a-z0-9_] o =, se encontró " + _c)
+                report_error(i, row, f'afd_id_ln:::state = {state} Se esperaba [id], se encontró "{_c}"')
                 i += 1
-
-        elif state == 2:
-            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            print(f'afd_id_eq:::final:{buffer}')
-            print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            return buffer, _i, i, row
-
-        elif state == 2:
-            pass
-
         _i += 1
 
 
@@ -252,7 +328,7 @@ def afd_order_data(s, _i, i, row):
 
     for _c in list(s[_i:]):
         c = ord(_c)
-        print(f'afd_order_data:::state = {state} row={row} i={i} {c}:{_c}')
+        # print(f'afd_order_data:::state = {state} row={row} i={i} {c}:{_c}')
         if state == 0:
             # print(f'afd_order_data:::diff es: {diff} _i:{_i}  i:{i} row:{row}')
             if diff == 0:
@@ -281,7 +357,7 @@ def afd_order_data(s, _i, i, row):
                 i += 1
                 state = 2
             else:
-                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "," , se encontró {_c}')
+                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "," , se encontró "{_c}"')
 
         elif state == 2:
             # print(f'afd_order_data:::diff es: {diff} _i:{_i}  i:{i} row:{row}')
@@ -312,7 +388,7 @@ def afd_order_data(s, _i, i, row):
                 i += 1
                 state = 4
             else:
-                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "," , se encontró {_c}')
+                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "," , se encontró "{_c}"')
 
         elif state == 4:
             # print(f'afd_order_data:::diff es: {diff} _i:{_i}  i:{i} row:{row}')
@@ -342,7 +418,7 @@ def afd_order_data(s, _i, i, row):
                 i += 1
                 state = 6
             else:
-                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "," , se encontró {_c}')
+                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "," , se encontró "{_c}"')
 
         elif state == 6:
             # print(f'afd_order_data:::diff es: {diff} _i:{_i}  i:{i} row:{row}')
@@ -353,7 +429,7 @@ def afd_order_data(s, _i, i, row):
                 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
                 print(f'afd_order_data:::state = {state}  tip reconocida: {tip}')
                 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-                buffer.append(address)
+                buffer.append(tip)
             elif diff > 1:
                 diff -= 1
             elif diff == 1:
@@ -374,7 +450,7 @@ def afd_order_data(s, _i, i, row):
                 i += 1
                 state = 6
             else:
-                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "\\n" , se encontró {_c}')
+                report_error(i, row, f'afd_order_data:::state = {state} Se esperaba "\\n" , se encontró "{_c}"')
         _i += 1
 
 
@@ -400,7 +476,7 @@ def afd_product(s, _i, i, row):
                 i += 1
                 state = 1
             else:
-                report_error(i, row, f'afd_product:::state = {state} Se esperaba [, se encontró {_c}')
+                report_error(i, row, f'afd_product:::state = {state} Se esperaba [, se encontró "{_c}"')
 
         elif state == 1:
             # print(f'afd_product:::diff es: {diff} _i:{_i}  i:{i} row:{row}')
@@ -432,7 +508,7 @@ def afd_product(s, _i, i, row):
                 print(f'afd_product:::state = {state} ; reconocido')
                 state = 3
             else:
-                report_error(i, row, f'afd_product:::state = {state} Se esperaba ; , se encontró {_c}')
+                report_error(i, row, f'afd_product:::state = {state} Se esperaba ; , se encontró "{_c}"')
 
         elif state == 3:
             # print(f'afd_product:::diff es: {diff}')
@@ -464,7 +540,7 @@ def afd_product(s, _i, i, row):
                 print(f'afd_product:::state = {state} ; reconocido')
                 state = 5
             else:
-                report_error(i, row, f'afd_product:::state = {state} Se esperaba ; , se encontró {_c}')
+                report_error(i, row, f'afd_product:::state = {state} Se esperaba ; , se encontró "{_c}"')
 
         elif state == 5:
             # print(f'afd_product:::diff es: {diff}')
@@ -497,7 +573,7 @@ def afd_product(s, _i, i, row):
                 i += 1
                 state = 7
             else:
-                report_error(i, row, f'afd_product:::state = {state} Se esperaba ; , se encontró {_c}')
+                report_error(i, row, f'afd_product:::state = {state} Se esperaba ; , se encontró "{_c}"')
         elif state == 7:
             # print(f'afd_product:::diff es: {diff}')
             if diff == 0:
@@ -530,7 +606,7 @@ def afd_product(s, _i, i, row):
                 return buffer, _i, i, row
 
             else:
-                report_error(i, row, f'afd_product:::state = {state} Se esperaba ], se encontró {_c}')
+                report_error(i, row, f'afd_product:::state = {state} Se esperaba ], se encontró "{_c}"')
         _i += 1
 
 
@@ -538,6 +614,7 @@ def afd_id_eq(s, _i, i, row):
     # global menu_string
     buffer = ""
     state = 0
+    first_i = i
 
     for _c in list(s[_i:]):
         c = ord(_c)
@@ -552,14 +629,14 @@ def afd_id_eq(s, _i, i, row):
             elif c == 32 or c == 9:  # Space Tab
                 i += 1
 
-            elif c == 61 or c == 39:
-                report_error(i, row, "afd_id_eq:::Se esperaba a-z, se encontró " + _c)
-                i += 1
-
-            else:
-                state = 1
+            elif 97 <= c <= 122:
+                first_i = i
                 i += 1
                 buffer += _c
+                state = 1
+            else:
+                report_error(i, row, f'afd_id_eq:::state = {state} Se esperaba a-z, se encontró "{_c}"')
+                i += 1
 
         elif state == 1:
             if (48 <= c <= 57) or (65 <= c <= 90) or (97 <= c <= 122) or c == 95:
@@ -570,20 +647,21 @@ def afd_id_eq(s, _i, i, row):
                 i = 1
                 row += 1
 
-            elif c == 32 or c == 9:  # tab space
-                i += 1
+            # elif c == 32 or c == 9:  # tab space
+                # i += 1
 
             elif c == 61:
                 i += 1
                 state = 2
             else:
-                report_error(i, row, "afd_id_eq:::Se esperaba [a-z0-9_] o =, se encontró " + _c)
+                report_error(i, row, f'afd_id_eq:::state = {state}:Se esperaba a-z, se encontró "{_c}"')
                 i += 1
 
         elif state == 2:
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             print(f'afd_id_eq:::final:{buffer}')
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            report_token(first_i, row, buffer, "id")
             return buffer, _i, i, row
 
         elif state == 2:
@@ -595,6 +673,7 @@ def afd_id_eq(s, _i, i, row):
 def afd_id_sem(s, _i, i, row):
     buffer = ""
     state = 0
+    first_i = i
 
     for _c in list(s[_i:]):
         c = ord(_c)
@@ -609,14 +688,14 @@ def afd_id_sem(s, _i, i, row):
             elif c == 32 or c == 9:
                 i += 1
 
-            elif c == 61 or c == 39:
-                report_error(i, row, f'afd_id_sem:::state = {state}:Se esperaba a-z, se encontró {_c}')
-                i += 1
-
-            else:
-                state = 1
+            elif 97 <= c <= 122:
+                first_i = i
                 i += 1
                 buffer += _c
+                state = 1
+            else:
+                report_error(i, row, f'afd_id_sem:::state = {state}:Se esperaba a-z, se encontró "{_c}"')
+                i += 1
 
         elif state == 1:
             if (48 <= c <= 57) or (65 <= c <= 90) or (97 <= c <= 122) or c == 95:
@@ -630,15 +709,16 @@ def afd_id_sem(s, _i, i, row):
             elif c == 32 or c == 9:  # tab space
                 i += 1
 
-            elif c == 59:
+            elif c == 59:  # ;
                 i += 1
                 state = 2
             else:
-                report_error(i, row, f'afd_id_sem:::state = {state} Se esperaba [a-z0-9_] o =, se encontró {_c}')
+                report_error(i, row, f'afd_id_sem:::state = {state} Se esperaba [a-z0-9_] o =, se encontró "{_c}"')
                 i += 1
 
         elif state == 2:
             print(f'afd_id_sem:::final:{buffer}')
+            report_token(first_i, row, buffer, "id")
             return buffer, _i-1, i-1, row
 
         _i += 1
@@ -647,6 +727,7 @@ def afd_id_sem(s, _i, i, row):
 def afd_chain(s, _i, i, row):
     buffer = ""
     state = 0
+    first_i = i
 
     for _c in list(s[_i:]):
         c = ord(_c)
@@ -654,6 +735,7 @@ def afd_chain(s, _i, i, row):
         if state == 0:
             if c == 39:  # '
                 i += 1
+                first_i = i  # Yes, after i++
                 state = 1
 
             elif c == 10:  # \n
@@ -663,7 +745,7 @@ def afd_chain(s, _i, i, row):
                 i += 1
 
             else:
-                report_error(i, row, f'afd_cadena:::state = {state} Se esperaba \', se encontró {_c}')
+                report_error(i, row, f'afd_cadena:::state = {state} Se esperaba \', se encontró "{_c}"')
 
         elif state == 1:
 
@@ -681,6 +763,7 @@ def afd_chain(s, _i, i, row):
             else:
                 # Terminado
                 _i += 1
+                report_token(first_i, row, buffer, "chain")
                 return buffer, _i, i, row
 
         _i += 1
@@ -705,7 +788,7 @@ def afd_section(s, _i, i, row):
                 i += 1
 
             else:
-                report_error(i, row, f'afd_section:::state = {state} Se esperaba \', se encontró {_c}')
+                report_error(i, row, f'afd_section:::state = {state} Se esperaba \', se encontró "{_c}"')
 
         elif state == 1:
 
@@ -736,7 +819,7 @@ def afd_section(s, _i, i, row):
                 return buffer, _i, i, row
 
             else:
-                report_error(i, row, f'afd_section:::state = {state} Se esperaba \', se encontró {_c}')
+                report_error(i, row, f'afd_section:::state = {state} Se esperaba \', se encontró "{_c}"')
 
         _i += 1
 
@@ -760,7 +843,7 @@ def afd_section_or_product(s, _i, i, row):
                 # _i += 1  # Not
                 return "Section", _i, i, row
             else:
-                report_error(i, row, f'afd_section_or_product:::state = {state} Se esperaba [ o \', se encontró {_c}')
+                report_error(i, row, f'afd_section_or_product:::state = {state} Se esperaba [ o \', se encontró "{_c}"')
         _i += 1
 
     # Si nada fue retornado
@@ -770,6 +853,7 @@ def afd_section_or_product(s, _i, i, row):
 def afd_number(s, _i, i, row):
     buffer = ""
     state = 0
+    first_i = i
 
     for _c in list(s[_i:]):
         c = ord(_c)
@@ -777,6 +861,7 @@ def afd_number(s, _i, i, row):
 
         if state == 0:
             if 48 <= c <= 57:  # 0-9
+                first_i = i
                 i += 1
                 buffer += _c
                 state = 1
@@ -789,7 +874,7 @@ def afd_number(s, _i, i, row):
                 i += 1
 
             else:
-                report_error(i, row, f'afd_number:::state = {state} Se esperaba [0-9] , se encontró {_c}')
+                report_error(i, row, f'afd_number:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
                 i += 1
 
         elif state == 1:
@@ -810,8 +895,9 @@ def afd_number(s, _i, i, row):
                 i += 1
 
             else:
-                # report_error(i, row, f'afd_number:::state = {state} Se esperaba [0-9] , se encontró {_c}')
+                # report_error(i, row, f'afd_number:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
                 i += 1
+                report_token(first_i, row, buffer, "number")
                 return buffer, _i, i, row
 
         elif state == 2:
@@ -827,7 +913,7 @@ def afd_number(s, _i, i, row):
                 i += 1
 
             # elif c == 46:  # .
-                # report_error(i, row, f'afd_number:::state = {state} Se esperaba [0-9] , se encontró {_c}')  # always .
+                # report_error(i, row, f'afd_number:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')  # always .
 
             else:
                 i += 1
@@ -838,6 +924,7 @@ def afd_number(s, _i, i, row):
 def afd_number_percentage(s, _i, i, row):
     buffer = ""
     state = 0
+    first_i = i
 
     for _c in list(s[_i:]):
         c = ord(_c)
@@ -845,6 +932,7 @@ def afd_number_percentage(s, _i, i, row):
 
         if state == 0:
             if 48 <= c <= 57:  # 0-9
+                first_i = i
                 i += 1
                 buffer += _c
                 state = 1
@@ -857,7 +945,7 @@ def afd_number_percentage(s, _i, i, row):
                 i += 1
 
             else:
-                report_error(i, row, f'afd_number_percentage:::state = {state} Se esperaba [0-9] , se encontró {_c}')
+                report_error(i, row, f'afd_number_percentage:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
                 i += 1
 
         elif state == 1:
@@ -872,7 +960,8 @@ def afd_number_percentage(s, _i, i, row):
 
             elif c == 37:  # %
                 _i += 1
-                i += 1
+                # i += 1  # idk why, it just didn't work
+                report_token(first_i, row, buffer, "number_percentage")
                 return buffer, _i, i, row
 
             elif c == 10:  # \n
@@ -883,7 +972,7 @@ def afd_number_percentage(s, _i, i, row):
                 i += 1
 
             else:
-                report_error(i, row, f'afd_number_percentage:::state = {state} Se esperaba [0-9] , se encontró {_c}')
+                report_error(i, row, f'afd_number_percentage:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
                 i += 1
 
         elif state == 2:
@@ -892,8 +981,9 @@ def afd_number_percentage(s, _i, i, row):
                 buffer += _c
 
             elif c == 37:  # %
-                i += 1
+                # i += 1  # idk why just it didn't work
                 _i += 1
+                report_token(first_i, row, buffer, "number_percentage")
                 return buffer, _i, i, row
 
             elif c == 10:  # \n
@@ -904,58 +994,19 @@ def afd_number_percentage(s, _i, i, row):
                 i += 1
 
             else:
-                report_error(i, row, f'afd_number_percentage:::state = {state} Se esperaba [0-9] , se encontró {_c}')
+                report_error(i, row, f'afd_number_percentage:::state = {state} Se esperaba [0-9] , se encontró "{_c}"')
                 i += 1
-        _i += 1
-
-
-def afd_integer(s, _i, i, row):
-    buffer = ""
-    state = 0
-
-    for _c in list(s[_i:]):
-        c = ord(_c)
-        print(f'afd_integer:::state = {state} _i:{_i} i={i} row={row}  {c}:{_c}')
-
-        if state == 0:
-            if 48 <= c <= 57:  # 0-9
-                i += 1
-                buffer += _c
-                state = 1
-
-            elif c == 10:  # \n
-                i = 1
-                row += 1
-
-            elif c == 32 or c == 9:  # tab space
-                i += 1
-
-            else:
-                i += 1
-                report_error(i, row, f'afd_integer:::state = {state} Se esperaba [0-9] , se encontró {_c}')
-
-        elif state == 1:
-            if 48 <= c <= 57:
-                i += 1
-                buffer += _c
-
-            elif c == 10:  # \n
-                i = 1
-                row += 1
-
-            elif c == 32 or c == 9:  # tab space
-                i += 1
-
-            else:
-                i += 1
-                return buffer, _i, i, row
-
         _i += 1
 
 
 def report_error(i, row, msg):
     print(f'row:{i} _ column:{row}:: {msg}')
     error_list.insert(ParseError(row, i, msg))
+
+
+def report_token(i, row, lex, token):
+    print(f'row:{i} _ column:{row}:: type={token} lex={lex}')
+    token_list.insert(Element(row, i, token, lex))
 
 
 def open_menu():
@@ -986,11 +1037,13 @@ def debug_load():
     global order_string
 
     with open("C:\\Users\\Matus\\Documents\\USAC\\LFP1\\LAB\\proyecto1\\menu.lfp", 'r', encoding="utf-8") as file:
-        menu_string = "".join(line for line in file)
+        menu_string = "".join(line for line in file) + "\n"
 
     with open("C:\\Users\\Matus\\Documents\\USAC\\LFP1\\LAB\\proyecto1\\orden.lfp", 'r', encoding="utf-8") as file:
-        order_string = "".join(line for line in file)
+        order_string = "".join(line for line in file) + "\n"
 
 
 if __name__ == '__main__':
     main()
+
+# Abi

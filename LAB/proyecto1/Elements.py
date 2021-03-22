@@ -38,3 +38,12 @@ class Order:
         self.address = address
         self.tip = tip
         self.shopped_products = shopped_products
+
+
+class Element:
+    def __init__(self, row, i, token, lex):
+        self.name = f'{row}-{i}'
+        self.row = row
+        self.i = i
+        self.token = token
+        self.lex = lex
